@@ -44,6 +44,24 @@ class TestCharacter(CharacterEntity):
         ###########
         #SearchAlgs
         ###########
+        def find_neighbors(character):
+            #Get Current Position of Robot
+            Current_Position = (wrld.me(character).x, wrld.me(character).y)
+            All_Neighbors = []
+            All_Neighbors.append((Current_Position[0] + 1, Current_Position[1]))
+            All_Neighbors.append((Current_Position[0] + 1, Current_Position[1] + 1))
+            All_Neighbors.append((Current_Position[0] + 1, Current_Position[1] - 1))
+            All_Neighbors.append((Current_Position[0], Current_Position[1] + 1))
+            All_Neighbors.append((Current_Position[0], Current_Position[1] - 1))
+            All_Neighbors.append((Current_Position[0] - 1, Current_Position[1]))
+            All_Neighbors.append((Current_Position[0] - 1, Current_Position[1] + 1))
+            All_Neighbors.append((Current_Position[0] - 1, Current_Position[1] - 1))
+            for neighbor in All_Neighbors:
+                if neighbor[0] < 0 or neighbor[1] < 0 or neighbor[0] >= wrld.width() or neighbor[1] >= wrld.height():
+                    All_Neighbors.remove(neighbor)
+                if wrld.wall_at(neighbor[0], neighbor[1]):
+                    All_Neighbors.remove(neighbor)
+            return All_Neighbors
         def BFS(G,S,T):
             #Initialize a queue with starting position and path to get there
             queue = [(S, [S])]
@@ -98,4 +116,9 @@ class TestCharacter(CharacterEntity):
         ###########
         #MainLoop##
         ###########
+        test = find_neighbors(self)
+        print(test)
         pass
+        
+
+        
