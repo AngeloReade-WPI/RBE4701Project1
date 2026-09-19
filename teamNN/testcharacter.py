@@ -44,9 +44,28 @@ class TestCharacter(CharacterEntity):
         ###########
         #SearchAlgs
         ###########
-        def BFS():
+        def BFS(G,S,T):
+            #Initialize a queue with starting position and path to get there
+            queue = [(S, [S])]
+            #Keep track of visited nodes to avoid cycles
+            visited = set()
+            #loop over the queue until it's empty
+            while queue:
+                #get the first item in the queue
+                ((current_nodeX, current_nodeY), path) = queue.pop(0)
+                #if the current node is the target, return the path
+                if (current_nodeX, current_nodeY) == T:
+                    return path
+                #if the current node has not been visited yet
+                if (current_nodeX, current_nodeY) not in visited:
+                    #mark the current node as visited
+                    visited.add((current_nodeX, current_nodeY))
+                    #add all unvisited neighbors to the queue
+                    for neighbor in G.neighbors((current_nodeX, current_nodeY)):
+                        if neighbor not in visited:
+                            queue.append((neighbor, path + [neighbor]))
             
-            pass
+            return None
 
         ###########
         #Update####
