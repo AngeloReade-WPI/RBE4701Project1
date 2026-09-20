@@ -17,28 +17,28 @@ class TestCharacter(CharacterEntity):
         #States####
         ###########
         class RobotStates(Enum):
+            START = auto()
             SAFE_NAVIGATION = auto()
-            STUPID_MONSTER_IN_PROXIMITY = auto()
-            SMART_MONSTER_IN_PROXIMITY = auto()
+            MONSTER_IN_PROXIMITY = auto()
             BOMB_SAFETY_PROTOCOL = auto()
            
         #Initialize robot into the Safe Navigation state
-        ROBOT_STATE = RobotStates.SAFE_NAVIGATION
+        ROBOT_STATE = RobotStates.START
 
         ###########
         #StateEntry
         ###########
 
         def Enter_Safe_Navigation():
+            nonlocal ROBOT_STATE
             ROBOT_STATE = RobotStates.SAFE_NAVIGATION
             pass
-        def Enter_Stupid_Monster_In_Proximity():
-            ROBOT_STATE = RobotStates.STUPID_MONSTER_IN_PROXIMITY
-            pass
-        def Enter_Smart_Monster_In_Proximity():
-            ROBOT_STATE = RobotStates.SMART_MONSTER_IN_PROXIMITY
+        def Enter_Monster_In_Proximity():
+            nonlocal ROBOT_STATE
+            ROBOT_STATE = RobotStates.MONSTER_IN_PROXIMITY
             pass
         def Enter_Bomb_Safety_Protocol():
+            nonlocal ROBOT_STATE
             ROBOT_STATE = RobotStates.BOMB_SAFETY_PROTOCOL
             pass
         ###########
@@ -63,6 +63,7 @@ class TestCharacter(CharacterEntity):
                     Invalid_Neighbors.append(neighbor)
             Valid_Neighbors = [neighbor for neighbor in All_Neighbors if neighbor not in Invalid_Neighbors]
             return Valid_Neighbors
+        
         def BFS(S,T):
             #Initialize a queue with starting position and path to get there
             queue = [(S, [S])]
@@ -95,6 +96,10 @@ class TestCharacter(CharacterEntity):
                 #Move to the next node in the path
             self.move(next_node[0] - current_node[0], next_node[1] - current_node[1])
 
+        def Expectimax():
+            pass
+
+
         ###########
         #Update####
         ###########
@@ -104,12 +109,12 @@ class TestCharacter(CharacterEntity):
                 Path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
                 follow_path(Path)
                 pass
-            if ROBOT_STATE == RobotStates.STUPID_MONSTER_IN_PROXIMITY:
+            if ROBOT_STATE == RobotStates.MONSTER_IN_PROXIMITY:
+                print("Monster in Proximity")
+                self.move(0, 0)
                 #Call Expectimax
                 pass
-            if ROBOT_STATE == RobotStates.SMART_MONSTER_IN_PROXIMITY:
-                #Call minimax
-                pass
+            
             if ROBOT_STATE == RobotStates.BOMB_SAFETY_PROTOCOL:
                 #Call BombSafetyProtocol 
                 pass
@@ -118,9 +123,35 @@ class TestCharacter(CharacterEntity):
         ###########
         #Checkers##
         ###########
+        #If there are no monsters in world, it is safe. If the next proposed move puts you within 2 spaces of a monster, it is not safe
         def Check_Safe_Navigation():
-            #TODO: make sure ts is safe to navigate
+            purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
+            count=0
+            if len(wrld.monsters) == 0:
+                return True
+    
+            for monsters in wrld.monsters.values():
+                for m in monsters:
+                    if abs(purposed_path[1][0] - m.x) <= 5 and abs(purposed_path[1][1] - m.y) <= 5:
+                        count+=1
+            if count > 0:
+                return False
             return True
+        #If there are no monsters in world,no monsters are in proximity. If the next proposed move puts you within 2 spaces of a monster, a monster is in proximity
+        def Check_Monster_In_Proximity():
+            purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
+            count=0
+            if len(wrld.monsters) == 0:
+                return False
+            for monsters in wrld.monsters.values():
+                for m in monsters:
+                    if abs(purposed_path[1][0] - m.x) <= 5 and abs(purposed_path[1][1] - m.y) <= 5:
+                        count+=1
+            if count > 0:
+                return True
+            return False
+            
+            
         ###########
         #Handlers##
         ###########
@@ -128,7 +159,10 @@ class TestCharacter(CharacterEntity):
             Enter_Safe_Navigation()
             Update()
             pass
-
+        def Handle_Monster_In_Proximity():
+            Enter_Monster_In_Proximity()
+            Update()
+            pass
 
         ###########
         #MainLoop##
@@ -136,5 +170,5 @@ class TestCharacter(CharacterEntity):
    
         if Check_Safe_Navigation():
             Handle_Safe_Navigation()
-        else:
-            pass
+        elif Check_Monster_In_Proximity():
+            Handle_Monster_In_Proximity()
