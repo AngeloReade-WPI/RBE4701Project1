@@ -170,37 +170,54 @@ class TestCharacter(CharacterEntity):
                     lesser_monster_threat = max(min_distance_to_monster1,min_distance_to_monster2)
                 #Create an equation that evaluates best player action based on both worst monster case scenarios
 
-                #Safe move counter for next move
-                    next_turn_escape_nodes = find_neighbors(action[0],action[1])
-                    next_turn_escape_nodes.append(wrld.me(self).x, wrld.me(self).y)
+                    # Safe move counter for the next move
+                    next_turn_escape_nodes = find_neighbors(action[0], action[1])
+
+                    # Staying at the proposed action is also an option
+                    next_turn_escape_nodes.append(action)
+
                     safe_escape_count = 0
-                    for node in next_turn_escape_nodes:
+
+                    for escape in next_turn_escape_nodes:
                         minimum_escape_distance = 1000
+
+                        # Check escape against every possible position of monster 1
                         for monster_action in Legal_Monster1_Actions:
-                            #calculate chebsvy distance between escape and that monster distance
-                            distance_monster_to_exit = max(abs(wrld.exitcell[0] - monster_action[0]), abs(wrld.exitcell[1] - monster_action[1]))
-                            #update minimum escape distance
-                            if distance_monster_to_exit < minimum_escape_distance:
-                                minimum_escape_distance = distance_monster_to_exit
-                                
+                            distance_to_monster = max( abs(escape[0] - monster_action[0]), abs(escape[1] - monster_action[1]))
 
+                            if distance_to_monster < minimum_escape_distance:
+                                minimum_escape_distance = distance_to_monster
 
-                    w1 = 1
-                    w2 =0.1
-                    w3= .5
-                    node_score_pairs[action] = ((w1 * biggest_monster_threat)+(w2 * lesser_monster_threat) - (w3 * distance_to_target))
-                    if biggest_monster_threat ==0:
+                        # Check escape against every possible position of monster 2
+                        for monster_action in Legal_Monster2_Actions:
+                            distance_to_monster = max(abs(escape[0] - monster_action[0]),abs(escape[1] - monster_action[1]))
+
+                            if distance_to_monster < minimum_escape_distance:
+                                minimum_escape_distance = distance_to_monster
+
+                        # Count this escape only if neither monster can get adjacent
+                        if minimum_escape_distance > 1:
+                            safe_escape_count += 1
+
+                    # Score the proposed player action
+                    w1 = 2
+                    w2 = 0.5
+                    w3 = 0.25
+                    w4 = 1
+
+                    node_score_pairs[action] = ((w1 * biggest_monster_threat) + (w2 * lesser_monster_threat) - (w3 * distance_to_target) + (w4 * safe_escape_count) )
+                    # Apply safety penalties
+                    if biggest_monster_threat == 0:
                         node_score_pairs[action] = -1000
-                    if biggest_monster_threat ==1:
-                        node_score_pairs[action] = -10
+                    else:
+                        if biggest_monster_threat == 1:
+                            node_score_pairs[action] -= 200
 
-                #choose the best player action based on worst case scenario for player based on monster actions
+                        if safe_escape_count == 0:
+                            node_score_pairs[action] -= 500
                 print(node_score_pairs)    
                 return max(node_score_pairs, key=node_score_pairs.get) 
-                
-
-
-        
+                            
         def advance_to_node(next_node):
             #Move to the next node in the path
             current_node = (wrld.me(self).x, wrld.me(self).y)
