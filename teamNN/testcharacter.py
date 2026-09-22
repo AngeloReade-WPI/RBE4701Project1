@@ -20,7 +20,6 @@ class TestCharacter(CharacterEntity):
             START = auto()
             SAFE_NAVIGATION = auto()
             MONSTER_IN_PROXIMITY = auto()
-            BOMB_SAFETY_PROTOCOL = auto()
            
         #Initialize robot into the Safe Navigation state
         ROBOT_STATE = RobotStates.START
@@ -37,10 +36,7 @@ class TestCharacter(CharacterEntity):
             nonlocal ROBOT_STATE
             ROBOT_STATE = RobotStates.MONSTER_IN_PROXIMITY
             pass
-        def Enter_Bomb_Safety_Protocol():
-            nonlocal ROBOT_STATE
-            ROBOT_STATE = RobotStates.BOMB_SAFETY_PROTOCOL
-            pass
+      
         ###########
         #SearchAlgs
         ###########
@@ -104,45 +100,107 @@ class TestCharacter(CharacterEntity):
             for monsters in wrld.monsters.values():
                 for m in monsters:
                     monster_list.append(m)
+
             if len(monster_list) == 1:
+                print("2monsters detected")
                 Legal_Monster_Actions = find_neighbors(monster_list[0].x, monster_list[0].y)
                 Legal_Monster_Actions.append((monster_list[0].x, monster_list[0].y)) #Add the option to stay in place
+           
+                #For every legal player action, evaluate the worst case scenario for the player based on all possible monster actions. Return the best player action based on the worst case scenario.
+                
+                #Create a dictionary of node_score_pairs where the key is the player action and the value is the score of that action based on the worst case scenario for the player based on the monster actions. The score should be calculated using an equation that takes into account the distance to the target and the distance to the nearest monster. The equation should return a score for each player action, and the action with the highest score should be chosen as the best action for the player.
+                node_score_pairs = {}
+                #Iterate through every legal player action
+                for action in Legal_Player_Actions:
+                #get chebyshev distance to target
+                    distance_to_target = max(abs(action[0] - wrld.exitcell[0]), abs(action[1] - wrld.exitcell[1]))
+                    #for action I in legal player actions, iterate through every legal monster action
+                    min_distance_to_monster = 1000
+                    for monster_action in Legal_Monster_Actions:
+                        #Get updated x,y to monster
+                        #get chebyshev distance to monster
+                        distance_to_monster = max(abs(action[0] - monster_action[0]), abs(action[1] - monster_action[1]))
+                        if distance_to_monster < min_distance_to_monster:
+                            min_distance_to_monster = distance_to_monster
+                            #get each iteration of the loop to return worst case scenario for the player based on the monster actions
+                    #create an equation that evaluates the best player action based on the worst case scenario for the player based on the monster actions. The equation should take into account the distance to the target and the distance to the nearest monster. The equation should return a score for each player action, and the action with the highest score should be chosen as the best action for the player.            
+                    w1=1
+                    w2=.5
+                    node_score_pairs[action] = (w1 * min_distance_to_monster) - (w2 * distance_to_target) 
+                    if min_distance_to_monster == 0:
+                        node_score_pairs[action] = -1000
+                    if min_distance_to_monster == 1:
+                        node_score_pairs[action] = -10
+                #choose the best player action based on the worst case scenario for the player based on the monster actions.
+                print(node_score_pairs)    
+                return max(node_score_pairs, key=node_score_pairs.get) 
+            
             elif len(monster_list) == 2:    
+                print("2monsters detected")
                 Legal_Monster1_Actions = find_neighbors(monster_list[0].x, monster_list[0].y)
                 Legal_Monster1_Actions.append((monster_list[0].x, monster_list[0].y)) #Add the option to stay in place
                 Legal_Monster2_Actions = find_neighbors(monster_list[1].x, monster_list[1].y)
                 Legal_Monster2_Actions.append((monster_list[1].x, monster_list[1].y)) #Add the option to stay in place
 
-            #For every legal player action, evaluate the worst case scenario for the player based on all possible monster actions. Return the best player action based on the worst case scenario.
-            
-            #Create a dictionary of node_score_pairs where the key is the player action and the value is the score of that action based on the worst case scenario for the player based on the monster actions. The score should be calculated using an equation that takes into account the distance to the target and the distance to the nearest monster. The equation should return a score for each player action, and the action with the highest score should be chosen as the best action for the player.
-            node_score_pairs = {}
-            #Iterate through every legal player action
-            for action in Legal_Player_Actions:
-             #Get updatedx,y to target
-             #get chebyshev distance to target
-                distance_to_target = max(abs(action[0] - wrld.exitcell[0]), abs(action[1] - wrld.exitcell[1]))
-                 #for action I in legal player actions, iterate through every legal monster action
-                min_distance_to_monster = 1000
-                for monster_action in Legal_Monster_Actions:
-                     #Get updated x,y to monster
-                    #get chebyshev distance to monster
-                    distance_to_monster = max(abs(action[0] - monster_action[0]), abs(action[1] - monster_action[1]))
-                    if distance_to_monster < min_distance_to_monster:
-                        min_distance_to_monster = distance_to_monster
-                        #get each iteration of the loop to return worst case scenario for the player based on the monster actions
-                #create an equation that evaluates the best player action based on the worst case scenario for the player based on the monster actions. The equation should take into account the distance to the target and the distance to the nearest monster. The equation should return a score for each player action, and the action with the highest score should be chosen as the best action for the player.            
-                w1=1
-                w2=.5
-                node_score_pairs[action] = (w1 * min_distance_to_monster) - (w2 * distance_to_target) 
-                if min_distance_to_monster == 0:
-                    node_score_pairs[action] = -1000
-                if min_distance_to_monster == 1:
-                    node_score_pairs[action] = -10
-            #return choose the best player action based on the worst case scenario for the player based on the monster actions.
-            print(node_score_pairs)    
-            return max(node_score_pairs, key=node_score_pairs.get) 
-    
+                #Create a dictionary of node_score_pairs where the key is the player action and the value is the score of that action based on the worst case scenario for the player based on the monster actions. The score should be calculated using an equation that takes into account the distance to the target and the distance to the nearest monster. The equation should return a score for each player action, and the action with the highest score should be chosen as the best action for the player.
+                node_score_pairs = {}
+                #iterate through every legal player action
+
+                for action in Legal_Player_Actions:
+                #get chebshev distance to target
+                    distance_to_target = max(abs(action[0] - wrld.exitcell[0]), abs(action[1] - wrld.exitcell[1]))
+                #Iterate through all monster actions for each monster. Return Both monsters min distance
+                    min_distance_to_monster1 = 1000
+                    for monster_action in Legal_Monster1_Actions:
+                        #Get updated x,y to monster
+                        #get chebyshev distance to monster
+                        distance_to_monster = max(abs(action[0] - monster_action[0]), abs(action[1] - monster_action[1]))
+                        if distance_to_monster < min_distance_to_monster1:
+                            min_distance_to_monster1 = distance_to_monster
+
+                    min_distance_to_monster2 = 1000
+                    for monster_action in Legal_Monster2_Actions:
+                        #Get updated x,y to monster
+                        #get chebyshev distance to monster
+                        distance_to_monster = max(abs(action[0] - monster_action[0]), abs(action[1] - monster_action[1]))
+                        if distance_to_monster < min_distance_to_monster2:
+                            min_distance_to_monster2 = distance_to_monster        
+                #Compare and see which monster is bigger threat
+                    biggest_monster_threat = min(min_distance_to_monster1,min_distance_to_monster2)
+                    lesser_monster_threat = max(min_distance_to_monster1,min_distance_to_monster2)
+                #Create an equation that evaluates best player action based on both worst monster case scenarios
+
+                #Safe move counter for next move
+                    next_turn_escape_nodes = find_neighbors(action[0],action[1])
+                    next_turn_escape_nodes.append(wrld.me(self).x, wrld.me(self).y)
+                    safe_escape_count = 0
+                    for node in next_turn_escape_nodes:
+                        minimum_escape_distance = 1000
+                        for monster_action in Legal_Monster1_Actions:
+                            #calculate chebsvy distance between escape and that monster distance
+                            distance_monster_to_exit = max(abs(wrld.exitcell[0] - monster_action[0]), abs(wrld.exitcell[1] - monster_action[1]))
+                            #update minimum escape distance
+                            if distance_monster_to_exit < minimum_escape_distance:
+                                minimum_escape_distance = distance_monster_to_exit
+                                
+
+
+                    w1 = 1
+                    w2 =0.1
+                    w3= .5
+                    node_score_pairs[action] = ((w1 * biggest_monster_threat)+(w2 * lesser_monster_threat) - (w3 * distance_to_target))
+                    if biggest_monster_threat ==0:
+                        node_score_pairs[action] = -1000
+                    if biggest_monster_threat ==1:
+                        node_score_pairs[action] = -10
+
+                #choose the best player action based on worst case scenario for player based on monster actions
+                print(node_score_pairs)    
+                return max(node_score_pairs, key=node_score_pairs.get) 
+                
+
+
+        
         def advance_to_node(next_node):
             #Move to the next node in the path
             current_node = (wrld.me(self).x, wrld.me(self).y)
@@ -165,11 +223,6 @@ class TestCharacter(CharacterEntity):
                 Path = minimax_evaluation_function()
                 advance_to_node(Path)
                 pass
-            
-            if ROBOT_STATE == RobotStates.BOMB_SAFETY_PROTOCOL:
-                #Call BombSafetyProtocol 
-                pass
-
 
         ###########
         #Checkers##
