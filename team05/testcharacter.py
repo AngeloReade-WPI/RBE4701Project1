@@ -210,7 +210,6 @@ class TestCharacter(CharacterEntity):
                     else:
                         if biggest_monster_threat == 1:
                             node_score_pairs[action] -= 200
-
                         if safe_escape_count == 0:
                             node_score_pairs[action] -= 500
                 print(node_score_pairs)    
@@ -296,3 +295,4 @@ class TestCharacter(CharacterEntity):
             Handle_Safe_Navigation()
         elif Check_Monster_In_Proximity():
             Handle_Monster_In_Proximity()
+
