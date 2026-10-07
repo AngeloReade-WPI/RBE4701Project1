@@ -17,29 +17,43 @@ class TestCharacter(CharacterEntity):
         #States####
         ###########
         class RobotStates(Enum):
-            START = auto()
             CHECK_PATH = auto()
             CLEAR_PATH = auto()
             BLOCKED_PATH = auto()
             BOMB_EVADE = auto()
-            EVADE_MONSTER = auto()
+            MONSTER_EVADE = auto()
            
         #Initialize robot into the Start state
-        ROBOT_STATE = RobotStates.START
+        ROBOT_STATE = RobotStates.CHECK_PATH
 
         ###########
         #StateEntry
         ###########
         
-        #Function to enter SAFE_Navigation State
-        def Enter_Safe_Navigation():
+        #Function to enter CHECK_PATH State
+        def Enter_CHECK_PATH():
             nonlocal ROBOT_STATE
-            ROBOT_STATE = RobotStates.SAFE_NAVIGATION
+            ROBOT_STATE = RobotStates.CHECK_PATH
             pass
-          #Function to enter Monster_IN_PROXIMITY State
-        def Enter_Monster_In_Proximity():
+        #Function to enter CLEAR_PATH State
+        def Enter_CLEAR_PATH():
             nonlocal ROBOT_STATE
-            ROBOT_STATE = RobotStates.MONSTER_IN_PROXIMITY
+            ROBOT_STATE = RobotStates.CLEAR_PATH
+            pass
+        #Function to enter BLOCKED_PATH State
+        def Enter_BLOCKED_PATH():
+            nonlocal ROBOT_STATE
+            ROBOT_STATE = RobotStates.BLOCKED_PATH
+            pass
+        #Function to enter BOMB_EVADE State
+        def Enter_BOMB_EVADE():
+            nonlocal ROBOT_STATE
+            ROBOT_STATE = RobotStates.BOMB_EVADE
+            pass
+        #Function to enter MONSTER_EVADE State
+        def Enter_MONSTER_EVADE():
+            nonlocal ROBOT_STATE
+            ROBOT_STATE = RobotStates.MONSTER_EVADE
             pass
       
         ###########
@@ -107,9 +121,15 @@ class TestCharacter(CharacterEntity):
 
         #This function decides logic based on current state
         def Update():
-            if ROBOT_STATE == RobotStates.SAFE_NAVIGATION:
+            if ROBOT_STATE == RobotStates.CHECK_PATH:
                 pass
-            if ROBOT_STATE == RobotStates.MONSTER_IN_PROXIMITY:
+            if ROBOT_STATE == RobotStates.CLEAR_PATH:
+                pass
+            if ROBOT_STATE == RobotStates.BLOCKED_PATH:
+                pass
+            if ROBOT_STATE == RobotStates.BOMB_EVADE:
+                pass
+            if ROBOT_STATE == RobotStates.MONSTER_EVADE:
                 pass
 
         ###########
