@@ -143,12 +143,48 @@ class TestCharacter(CharacterEntity):
         #Return true if path is clear of walls. 
         # If there are monsters in world, return true if monsters are behind character.
         def check_path_clear():
-            pass
+            #if no monsters are in world, check if path is clear of walls
+            purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
+            for i in range(len(purposed_path) - 1):
+                #for the purposed path, see if there are any walls in the way
+                if wrld.wall_at(purposed_path[i][0], purposed_path[i][1]):
+                    #if there is a wall in they way, check if that entire row is blocked by walls
+                    for j in range(wrld.width()):
+                        if  wrld.wall_at(j, purposed_path[i][1]):
+                            clear_path = False
+                else:
+                    clear_path = True
+            #if path is clear but there is a monster between the character and the exit, return false
+            if len(wrld.monsters) > 0: 
+                if clear_path:
+                    for monster in wrld.monsters:
+                        if monster.y > wrld.me(self).y:
+                            clear_path = False
+                        
+            return clear_path
 
         #Return true if path is blocked by walls. 
         # If there are monsters in world, return true if monsters are in front of character.
         def check_path_blocked():
-            pass
+               #if no monsters are in world, check if path is blocked by walls
+                        purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
+                        for i in range(len(purposed_path) - 1):
+                            #for the purposed path, see if there are any walls in the way
+                            if wrld.wall_at(purposed_path[i][0], purposed_path[i][1]):
+                                #if there is a wall in they way, check if that entire row is blocked by walls
+                                for j in range(wrld.width()):
+                                    if  wrld.wall_at(j, purposed_path[i][1]):
+                                        blocked_path = True
+                            else:
+                                blocked_path = False
+                        #if path is clear but there is a monster between the character and the exit, return True
+                        if len(wrld.monsters) > 0: 
+                            if not blocked_path:
+                                for monster in wrld.monsters:
+                                    if monster.y > wrld.me(self).y:
+                                        blocked_path = True
+                                    
+                        return blocked_path
 
         # Return true if there is a bomb present in the world. 
         def check_bomb_placed():
