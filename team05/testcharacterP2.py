@@ -55,12 +55,19 @@ class TestCharacter(CharacterEntity):
             nonlocal ROBOT_STATE
             ROBOT_STATE = RobotStates.MONSTER_EVADE
             pass
-      
         ###########
-        #SearchAlgs
+        #HelpFuncs#
         ###########
 
-        #Finds All legal moves a character can make based on current position
+        #returns a list of monsters in the world
+        def get_monster_list():
+            monster_list = []
+            for monsters in wrld.monsters.values():
+                for m in monsters:
+                    monster_list.append(m)
+            return monster_list
+
+         #Finds All legal moves a character can make based on current position
         def find_neighbors(nodeX, nodeY):
             Current_Position = (nodeX,nodeY)
             All_Neighbors = []
@@ -81,7 +88,20 @@ class TestCharacter(CharacterEntity):
                     Invalid_Neighbors.append(neighbor)
             Valid_Neighbors = [neighbor for neighbor in All_Neighbors if neighbor not in Invalid_Neighbors]
             return Valid_Neighbors
+
+        #Follow the path given by BFS
+        def follow_path(path):
+            current_node = path[0]
+            next_node = path[1]
+                #Move to the next node in the path
+            self.move(next_node[0] - current_node[0], next_node[1] - current_node[1])
+
         
+        ###########
+        #SearchAlgs
+        ###########
+
+       
         #Breadth First Search Algorithm
         def BFS(S,T):
             #Initialize a queue with starting position and path to get there
@@ -107,17 +127,6 @@ class TestCharacter(CharacterEntity):
                             discovered.add(neighbor)
             return None
         
-        #Follow the path given by BFS
-        def follow_path(path):
-            current_node = path[0]
-            next_node = path[1]
-                #Move to the next node in the path
-            self.move(next_node[0] - current_node[0], next_node[1] - current_node[1])
-
-        ###########
-        #HelpFuncs#
-        ###########
-
 
         ###########
         #Update####
@@ -141,61 +150,35 @@ class TestCharacter(CharacterEntity):
         ###########
 
         #Return true if path is clear of walls. 
-        # If there are monsters in world, return true if monsters are behind character.
         def check_path_clear():
-            #if no monsters are in world, check if path is clear of walls
             purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
-            for i in range(len(purposed_path) - 1):
-                #for the purposed path, see if there are any walls in the way
-                if wrld.wall_at(purposed_path[i][0], purposed_path[i][1]):
-                    #if there is a wall in they way, check if that entire row is blocked by walls
-                    for j in range(wrld.width()):
-                        if  wrld.wall_at(j, purposed_path[i][1]):
-                            clear_path = False
-                else:
-                    clear_path = True
-            #if path is clear but there is a monster between the character and the exit, return false
-            if len(wrld.monsters) > 0: 
-                if clear_path:
-                    for monster in wrld.monsters:
-                        if monster.y > wrld.me(self).y:
-                            clear_path = False
-                        
-            return clear_path
+            if purposed_path is not None:
+                return True
 
         #Return true if path is blocked by walls. 
-        # If there are monsters in world, return true if monsters are in front of character.
         def check_path_blocked():
-               #if no monsters are in world, check if path is blocked by walls
-                        purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
-                        for i in range(len(purposed_path) - 1):
-                            #for the purposed path, see if there are any walls in the way
-                            if wrld.wall_at(purposed_path[i][0], purposed_path[i][1]):
-                                #if there is a wall in they way, check if that entire row is blocked by walls
-                                for j in range(wrld.width()):
-                                    if  wrld.wall_at(j, purposed_path[i][1]):
-                                        blocked_path = True
-                            else:
-                                blocked_path = False
-                        #if path is clear but there is a monster between the character and the exit, return True
-                        if len(wrld.monsters) > 0: 
-                            if not blocked_path:
-                                for monster in wrld.monsters:
-                                    if monster.y > wrld.me(self).y:
-                                        blocked_path = True
-                                    
-                        return blocked_path
-
-        # Return true if there is a bomb present in the world. 
-        def check_bomb_placed():
-            pass
+            purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
+            if purposed_path is None:
+                return True
 
         # If there is a direct path to the monster in front of the character, return true.
         def check_monster_in_path():
-            pass
+            monster_list = get_monster_list()
+            for monster in monster_list:
+                purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), (monster.x, monster.y))
+                if purposed_path is not None:
+                    return True
+            return False
+
+         # Return true if there is a bomb present in the world. 
+        def check_bomb_placed():
+            if len(wrld.bombs) > 0:
+                return True
 
         # If there is an explosion in the world, return true. 
         def check_bomb_exploded():
+            if len(wrld.explosions) > 0:
+                return True
             pass
         
         ###########
