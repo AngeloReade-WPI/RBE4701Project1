@@ -114,7 +114,11 @@ class TestCharacter(CharacterEntity):
                 #Move to the next node in the path
             self.move(next_node[0] - current_node[0], next_node[1] - current_node[1])
 
-            
+        ###########
+        #HelpFuncs#
+        ###########
+
+
         ###########
         #Update####
         ###########
@@ -136,8 +140,28 @@ class TestCharacter(CharacterEntity):
         #Checkers##
         ###########
 
-            
-            
+        #Return true if path is clear of walls. 
+        # If there are monsters in world, return true if monsters are behind character.
+        def check_path_clear():
+            pass
+
+        #Return true if path is blocked by walls. 
+        # If there are monsters in world, return true if monsters are in front of character.
+        def check_path_blocked():
+            pass
+
+        # Return true if there is a bomb present in the world. 
+        def check_bomb_placed():
+            pass
+
+        # If there is a direct path to the monster in front of the character, return true.
+        def check_monster_in_path():
+            pass
+
+        # If there is an explosion in the world, return true. 
+        def check_bomb_exploded():
+            pass
+        
         ###########
         #Handlers##
         ###########
