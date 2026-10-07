@@ -184,7 +184,26 @@ class TestCharacter(CharacterEntity):
         ###########
         #Handlers##
         ###########
-        
+        def handle_check_path_clear():
+            Enter_CLEAR_PATH()
+            Update()
+            pass
+        def handle_check_path_blocked():
+            Enter_BLOCKED_PATH()
+            Update()
+            pass
+        def handle_check_monster_in_path():
+            Enter_MONSTER_EVADE()
+            Update()
+            pass
+        def handle_check_bomb_placed():
+            Enter_BOMB_EVADE()
+            Update()
+            pass
+        def handle_check_bomb_exploded():
+            Enter_CHECK_PATH()
+            Update()
+            pass    
 
         ###########
         #RunCode###
