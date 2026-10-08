@@ -55,6 +55,30 @@ class TestCharacter(CharacterEntity):
             nonlocal ROBOT_STATE
             ROBOT_STATE = RobotStates.MONSTER_EVADE
             pass
+
+        
+        
+        ###########
+        #Weights##
+        ###########
+
+        self.Weights = {
+            RobotStates.BLOCKED_PATH: {
+                distance_to_exit: 0.0,
+                distance_to_wall: 0.0,
+                bomb: 0.0
+            },
+
+            RobotStates.BOMB_EVADE: {
+                #TODO: Add weights for BOMB_EVADE state
+            },
+
+            RobotStates.MONSTER_EVADE: {
+                #TODO: Add weights for MONSTER_EVADE state
+            }
+        }
+            
+
         ###########
         #HelpFuncs#
         ###########
@@ -185,13 +209,28 @@ class TestCharacter(CharacterEntity):
             return features
 
             
-        def get_blocked_path_Q_value(self, Weights):
+        def get_blocked_path_Q_value(action):
+
+           features = get_blocked_path_features(action)
+           blocked_path_weights = self.Weights[RobotStates.BLOCKED_PATH]
+           Q_value =0.0
+           for feature_name, feature_value in features.items():
+                weight = blocked_path_weights.get(feature_name, 0.0)
+                Q_value += weight * feature_value
 
 
-            pass
+           return Q_value
+        
         def choose_blocked_path_action():
-            pass
-
+            available_actions = get_blocked_path_actions()
+            best_action = None
+            best_Q_value = float('-inf')
+            for action in available_actions:
+                Q_value = get_blocked_path_Q_value(action)
+                if Q_value > best_Q_value:
+                    best_Q_value = Q_value
+                    best_action = action
+            return best_action
 
 
         ###########
