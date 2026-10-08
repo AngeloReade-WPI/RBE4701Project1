@@ -64,17 +64,23 @@ class TestCharacter(CharacterEntity):
 
         self.Weights = {
             RobotStates.BLOCKED_PATH: {
-                distance_to_exit: 0.0,
-                distance_to_wall: 0.0,
-                bomb: 0.0
+                distance_to_exit: 1.0,
+                distance_to_wall: 1.0,
+                bomb: 1.0
             },
 
             RobotStates.BOMB_EVADE: {
                 #TODO: Add weights for BOMB_EVADE state
+                distance_to_exit: 1.0,
+                distance_to_bomb: 1.0,
+                bomb: 1.0
             },
 
             RobotStates.MONSTER_EVADE: {
                 #TODO: Add weights for MONSTER_EVADE state
+                distance_to_exit: 1.0,
+                distance_to_monster: 1.0,
+                bomb: 1.0
             }
         }
             
@@ -200,7 +206,7 @@ class TestCharacter(CharacterEntity):
 
             if action_type == "BOMB":
                 bomb = 1.0
-                self.bomb.append((action_x, action_y))
+                # self.bomb.append((action_x, action_y))
             else:
                 bomb = 0.0
 
@@ -209,10 +215,30 @@ class TestCharacter(CharacterEntity):
                 "distance_to_exit": distance_to_exit / board_size,
                 "distance_to_bomb": distance_to_bomb / board_size,
                 # "distance_to_explosion": distance_to_explosion / board_size,
-                # "bomb": bomb
+                "bomb": bomb
             }
 
             return features
+        def get_bomb_Q_value(action, bomb):
+            features = get_bomb_features(action, bomb)
+            bomb_weights = self.Weights[RobotStates.BOMB_EVADE]
+            Q_value = 0.0
+            for feature_name, feature_value in features.items():
+                weight = bomb_weights.get(feature_name, 0.0)
+                Q_value += weight * feature_value
+
+            return Q_value
+        
+        def choose_bomb_action(bomb):
+            available_actions = get_bomb_actions()
+            best_action = None
+            best_Q_value = float('-inf')
+            for action in available_actions:
+                Q_value = get_bomb_Q_value(action, bomb)
+                if Q_value > best_Q_value:
+                    best_Q_value = Q_value
+                    best_action = action
+            return best_action
         
         #returns a list of available actions for the character to take when the path is blocked: move, wait, or bomb
         def get_blocked_path_actions():
