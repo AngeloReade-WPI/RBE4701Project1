@@ -220,7 +220,8 @@ class TestCharacter(CharacterEntity):
             }
 
             return features
-        def get_bomb_Q_value(action, bomb):
+        
+        def get_bomb_Q_value(weight, action, bomb):
             features = get_bomb_features(action, bomb)
             bomb_weights = self.Weights[RobotStates.BOMB_EVADE]
             Q_value = 0.0
@@ -250,7 +251,7 @@ class TestCharacter(CharacterEntity):
                 available_actions.append("MOVE", neighbor[0], neighbor[1])
                 available_actions.append("WAIT", current_position[0], current_position[1])
                 available_actions.append("BOMB", current_position[0], current_position[1])
-                return available_actions
+            return available_actions
 
         
         def get_blocked_path_features(action):
@@ -297,13 +298,14 @@ class TestCharacter(CharacterEntity):
 
             
         def get_blocked_path_Q_value(action):
-
-           features = get_blocked_path_features(action)
-           blocked_path_weights = self.Weights[RobotStates.BLOCKED_PATH]
-           Q_value =0.0
-           for feature_name, feature_value in features.items():
+ 
+            features = get_blocked_path_features(action)
+            blocked_path_weights = self.Weights[RobotStates.BLOCKED_PATH]
+            Q_value =0.0
+            for feature_name, feature_value in features.items():
                 weight = blocked_path_weights.get(feature_name, 0.0)
                 Q_value += weight * feature_value
+            return Q_value
 
             
         def choose_blocked_path_action():
@@ -350,15 +352,14 @@ class TestCharacter(CharacterEntity):
             }
             return features
         
-        def monster_evade_Q_value(self, Weights):
-
+        def monster_evade_Q_value(self, Weights, action):
+ 
             features = monster_evade_features(action)
-
-            Q_value = 0
-
-            for feature in features:
-                Q_value += Weights[feature] * features[feature]
-
+            monster_evade_weights = self.Weights[RobotStates.MONSTER_EVADE]
+            Q_value =0.0
+            for feature_name, feature_value in features.items():
+                weight = monster_evade_weights.get(feature_name, 0.0)
+                Q_value += weight * feature_value
             return Q_value
 
         def choose_monster_evade_action():
@@ -376,7 +377,6 @@ class TestCharacter(CharacterEntity):
             return best_action  
 
 
-           return Q_value
         
         
 
