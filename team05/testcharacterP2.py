@@ -127,6 +127,72 @@ class TestCharacter(CharacterEntity):
                             discovered.add(neighbor)
             return None
         
+        ###############
+        #Apr.Q-Learning
+        ###############
+
+        #returns a list of available actions for the character to take when the path is blocked: move, wait, or bomb
+        def get_blocked_path_actions():
+            current_position = (wrld.me(self).x, wrld.me(self).y)
+            available_actions = []
+
+            for neighbor in find_neighbors(current_position[0], current_position[1]):
+                available_actions.append("MOVE", neighbor[0], neighbor[1])
+                available_actions.append("WAIT", current_position[0], current_position[1])
+                available_actions.append("BOMB", current_position[0], current_position[1])
+                return available_actions
+            pass
+
+        def get_blocked_path_features(action):
+            action_type = action[0]
+            action_x = action[1]
+            action_y = action[2]
+
+            board_size = max(wrld.width(), wrld.height())
+
+            # Chebyshev distance because diagonal movement is allowed
+            distance_to_exit = max(
+                abs(action_x - wrld.exitcell[0]),
+                abs(action_y - wrld.exitcell[1])
+            )
+
+            # Default if no wall is found
+            distance_to_wall = board_size
+
+            # Look downward from the proposed action
+            for i in range(1, wrld.height()):
+                check_y = action_y + i
+
+                # Check bounds before calling wall_at()
+                if check_y >= wrld.height():
+                    break
+
+                if wrld.wall_at(action_x, check_y):
+                    distance_to_wall = i
+                    break
+
+            if action_type == "BOMB":
+                bomb = 1.0
+            else:
+                bomb = 0.0
+
+            features = {
+                "distance_to_exit": distance_to_exit / board_size,
+                "distance_to_wall": distance_to_wall / board_size,
+                "bomb": bomb
+            }
+
+            return features
+
+            
+        def get_blocked_path_Q_value(self, Weights):
+
+
+            pass
+        def choose_blocked_path_action():
+            pass
+
+
 
         ###########
         #Update####
