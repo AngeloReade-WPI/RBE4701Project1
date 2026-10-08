@@ -362,7 +362,7 @@ class TestCharacter(CharacterEntity):
                 Q_value += weight * feature_value
             return Q_value
 
-        def choose_monster_evade_action():
+        def choose_monster_evade_action(Weights):
             actions = monster_evade_actions()
 
             best_action = None
@@ -377,8 +377,27 @@ class TestCharacter(CharacterEntity):
             return best_action  
 
 
-        
-        
+        def get_next_state_Q_value_monsterEvade(Weights):
+            available_actions = monster_evade_actions()
+            best_Q_value = float("-inf")
+            for next_action in available_actions:
+                Q_value = monster_evade_Q_value(next_action, Weights)
+                if Q_value > best_Q_value:
+                    best_Q_value = Q_value
+            return best_Q_value
+
+        def act_on_q_value():
+            actions = get_blocked_path_actions()
+            for action in actions:
+                Q_value = get_blocked_path_Q_value(action)
+                if Q_value > 0:
+                    if action[0] == "MOVE":
+                        self.move(action[1] - wrld.me(self).x, action[2] - wrld.me(self).y)
+                    elif action[0] == "WAIT":
+                        self.wait()
+                    elif action[0] == "BOMB":
+                        self.place_bomb()
+
 
 
         ###########
