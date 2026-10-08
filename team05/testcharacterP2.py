@@ -1,4 +1,5 @@
 # This is necessary to find the main code
+from pyexpat import features
 import sys
 sys.path.insert(0, '../bomberman')
 # Import necessary stuff
@@ -141,7 +142,6 @@ class TestCharacter(CharacterEntity):
                 available_actions.append("WAIT", current_position[0], current_position[1])
                 available_actions.append("BOMB", current_position[0], current_position[1])
                 return available_actions
-            pass
 
         def get_blocked_path_features(action):
             action_type = action[0]
@@ -191,6 +191,64 @@ class TestCharacter(CharacterEntity):
             pass
         def choose_blocked_path_action():
             pass
+        # returns a list of available actions for the character to evade a monster
+        def monster_evade_actions():
+            current_position = (wrld.me(self).x, wrld.me(self).y)
+            available_actions = []
+            # Appends all possible movement actions from neighboring cells to the available_actions list
+            for neighbor in find_neighbors(current_position[0], current_position[1]):
+                available_actions.append(("MOVE", neighbor[0], neighbor[1]))
+                #moved outside for loop
+            available_actions.append(("WAIT", current_position[0], current_position[1]))
+            return available_actions
+
+        def monster_evade_features(action):
+            action_type = action[0]
+            action_x = action[1]
+            action_y = action[2]
+
+            board_size = max(wrld.width(), wrld.height())
+            distance_to_monster = board_size
+
+            for monster in get_monster_list():
+                distance = max(abs(action_x - monster.x),abs(action_y - monster.y))
+
+                if distance < distance_to_monster:
+                    distance_to_monster = distance
+        
+            distance_to_exit = max(abs(action_x - wrld.exitcell[0]),abs(action_y - wrld.exitcell[1]))
+        
+            features = {
+            "distance_to_monster": distance_to_monster / board_size,
+            "distance_to_exit": distance_to_exit / board_size
+            }
+            return features
+        
+        def monster_evade_Q_value(self, Weights):
+
+            features = monster_evade_features(action)
+
+            Q_value = 0
+
+            for feature in features:
+                Q_value += Weights[feature] * features[feature]
+
+            return Q_value
+
+        def choose_monster_evade_action():
+            actions = monster_evade_actions()
+
+            best_action = None
+            best_Q_value = float("-inf")
+
+            for action in actions:
+                Q_value = monster_evade_Q_value(action, Weights)
+
+                if Q_value > best_Q_value:
+                    best_Q_value = Q_value
+                    best_action = action
+            return best_action  
+
 
 
 
