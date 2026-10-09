@@ -397,8 +397,63 @@ class TestCharacter(CharacterEntity):
                         self.wait()
                     elif action[0] == "BOMB":
                         self.place_bomb()
+        
+        def get_reward(previous_state, previous_position, current_position,
+                    previous_monster_distance, current_monster_distance,
+                    died=False, reachedExit=False,
+                    escapedBomb=False, destroyedWall=False,
+                    previous_bomb_danger=False, current_bomb_danger=False):
 
+            if died:
+                return -100
 
+            if reachedExit:
+                return 100
+
+            previous_exit_distance = max(
+                abs(previous_position[0] - wrld.exitcell[0]),
+                abs(previous_position[1] - wrld.exitcell[1])
+            )
+
+            current_exit_distance = max(
+                abs(current_position[0] - wrld.exitcell[0]),
+                abs(current_position[1] - wrld.exitcell[1])
+            )
+
+            exit_progress = previous_exit_distance - current_exit_distance
+            monster_progress = current_monster_distance - previous_monster_distance
+
+            reward = -0.1
+
+            if previous_state == RobotStates.MONSTER_EVADE:
+                reward += (1.0 * monster_progress) + (0.5 * exit_progress)
+
+                if current_monster_distance == 0:
+                    reward -= 100
+                elif current_monster_distance == 1:
+                    reward -= 20
+                elif current_monster_distance == 2:
+                    reward -= 10
+
+            elif previous_state == RobotStates.BOMB_EVADE:
+                if previous_bomb_danger and not current_bomb_danger:
+                    reward += 5
+                elif current_bomb_danger:
+                    reward -= 3
+
+                if escapedBomb:
+                    reward += 10
+
+            elif previous_state == RobotStates.BLOCKED_PATH:
+                if destroyedWall:
+                    reward += 15
+
+                reward += (0.5 * exit_progress)
+
+            elif previous_state == RobotStates.CLEAR_PATH:
+                reward += (1.0 * exit_progress)
+
+            return reward
 
         ###########
         #Update####
@@ -451,8 +506,8 @@ class TestCharacter(CharacterEntity):
         def check_bomb_exploded():
             if len(wrld.explosions) > 0:
                 return True
-            pass
-        
+            return False
+
         ###########
         #Handlers##
         ###########
