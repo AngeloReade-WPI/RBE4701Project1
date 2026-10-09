@@ -1,10 +1,12 @@
 # This is necessary to find the main code
+import os
 from pyexpat import features
 import sys
 sys.path.insert(0, '../bomberman')
 # Import necessary stuff
 from entity import CharacterEntity
 from colorama import Fore, Back
+import pandas as pd
 
 #import enum for RobotStates
 from enum import Enum, auto
@@ -174,12 +176,10 @@ class TestCharacter(CharacterEntity):
 
             return available_actions
             
-        def get_bomb_features(action, bomb):
+        def get_bomb_features(action, bomb, bombs):
             action_type = action[0]
             action_x = action[1]
             action_y = action[2]
-
-            
 
             board_size = max(wrld.width(), wrld.height())
 
@@ -193,21 +193,22 @@ class TestCharacter(CharacterEntity):
             distance_to_bomb = board_size
 
             # Coords for where bomb was placed 
-            for i in bomb:
-                bombx = bomb[i].x
-                bomby = bomb[i].y
+            for i in bombs:
+                bombx = action_x
+                bomby = action_y
                 # Calculate distance to the bomb
                 distance_to_bomb = max(
                     abs(action_x - bombx),
                     abs(action_y - bomby))
-                # for x in [-1, -2, -3, -4, -5, 1, 2, 3, 4, 5]:
-                #     for y in [-1, -2, -3, -4, -5, 1, 2, 3, 4, 5]:
-                #         distance_to_explosion = distance_to_explosion.append((distance_to_bomb.x+x, distance_to_bomb.y+y))
-            
+                distance_to_explosion = []
+                for x in [-1, -2, -3, -4, -5, 1, 2, 3, 4, 5]:
+                    for y in [-1, -2, -3, -4, -5, 1, 2, 3, 4, 5]:
+                        distance_to_explosion = distance_to_explosion.append((distance_to_bomb.x+x, distance_to_bomb.y+y))
+                        distance_to_explosion = distance_to_explosion.sort()
 
             if action_type == "BOMB":
                 bomb = 1.0
-                # self.bomb.append((action_x, action_y))
+                bombs.append((action_x, action_y))
             else:
                 bomb = 0.0
 
@@ -215,14 +216,14 @@ class TestCharacter(CharacterEntity):
             features = {
                 "distance_to_exit": distance_to_exit / board_size,
                 "distance_to_bomb": distance_to_bomb / board_size,
-                # "distance_to_explosion": distance_to_explosion / board_size,
+                "distance_to_explosion": distance_to_explosion / board_size,
                 "bomb": bomb
             }
 
             return features
         
         def get_bomb_Q_value(weight, action, bomb):
-            features = get_bomb_features(action, bomb)
+            features = get_bomb_features(action, bomb, self.bombs)
             bomb_weights = self.Weights[RobotStates.BOMB_EVADE]
             Q_value = 0.0
             for feature_name, feature_value in features.items():
@@ -362,7 +363,7 @@ class TestCharacter(CharacterEntity):
                 Q_value += weight * feature_value
             return Q_value
 
-        def choose_monster_evade_action():
+        def choose_monster_evade_action(Weights):
             actions = monster_evade_actions()
 
             best_action = None
@@ -378,7 +379,25 @@ class TestCharacter(CharacterEntity):
 
 
         
+        ##################
+        #Q Values in CSV##
+        ##################
+
+        if os.path.exists("q_values.csv"):
+            last_q_values = pd.read_csv("q_values.csv")
+        else:
+            q_values = pd.DataFrame(columns=["State", "Action", "Q_Value"]) # Init a new dataframe for q values
+
+        q_values.loc[len(q_values)] = [  #Creates a new row in dataframe
+            ROBOT_STATE.name, 
+            best_action, 
+            best_Q_value
+            ]
         
+        q_values.to_csv("q_values.csv", index=False) #Generate the csv
+
+
+
 
 
         ###########
