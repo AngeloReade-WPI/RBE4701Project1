@@ -8,11 +8,12 @@ from game import Game
 
 # TODO This is your code!
 sys.path.insert(1, '../teamNN')
+
 from testcharacterP2 import TestCharacter
 
 
 # Create the game
-g = Game.fromfile('trainingmap2_doublewall.txt')
+g = Game.fromfile('trainingmap1_wall.txt')
 
 # TODO Add your character
 g.add_character(TestCharacter("me", # name
