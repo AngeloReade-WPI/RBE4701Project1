@@ -383,20 +383,19 @@ class TestCharacter(CharacterEntity):
         #Q Values in CSV##
         ##################
 
-        if os.path.exists("q_values.csv"):
-            last_q_values = pd.read_csv("q_values.csv")
-        else:
-            q_values = pd.DataFrame(columns=["State", "Action", "Q_Value"]) # Init a new dataframe for q values
+        def QValue_archive():
+            if os.path.exists("q_values.csv"):
+                last_q_values = pd.read_csv("q_values.csv")
+            else:
+                q_values = pd.DataFrame(columns=["State", "Action", "Q_Value"]) # Init a new dataframe for q values
 
-        q_values.loc[len(q_values)] = [  #Creates a new row in dataframe
-            ROBOT_STATE.name, 
-            best_action, 
-            best_Q_value
-            ]
-        
-        q_values.to_csv("q_values.csv", index=False) #Generate the csv
-
-
+            q_values.loc[len(q_values)] = [  #Creates a new row in dataframe
+                ROBOT_STATE.name, 
+                best_action, 
+                best_Q_value
+                ]
+            
+            q_values.to_csv("q_values.csv", index=False) #Generate the csv
 
 
 
