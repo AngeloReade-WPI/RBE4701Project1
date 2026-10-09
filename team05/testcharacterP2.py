@@ -23,9 +23,9 @@ class RobotStates(Enum):
     MONSTER_EVADE = auto()
 
 class TestCharacter(CharacterEntity):
-
+    training = True
     # Use epsilon=0.0 for evaluation after training.
-    epsilon = 0.15
+    epsilon = 0.2
 
     def choose_q_action(self, available_actions, q_function):
         if not available_actions:
@@ -105,7 +105,7 @@ class TestCharacter(CharacterEntity):
         saved_weights.to_csv("weights.csv", index=False)
 
     def update_previous_weights(self, reward, next_max_Q):
-        alpha = 0.2
+        alpha = 0.5
         gamma = 0.9
 
         error = (
@@ -838,3 +838,4 @@ class TestCharacter(CharacterEntity):
         else:
             handle_check_path_blocked()
       # Test Commit 
+
