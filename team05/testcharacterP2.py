@@ -160,9 +160,83 @@ class TestCharacter(CharacterEntity):
                             discovered.add(neighbor)
             return None
         
-        ###############
-        #Apr.Q-Learning
-        ###############
+        #########################
+        #Apr.Q-Learning Equations
+        #########################
+          #returns a list of available actions for the character to take when the path is blocked: move, wait, or bomb
+        def get_blocked_path_actions():
+            current_position = (wrld.me(self).x, wrld.me(self).y)
+            available_actions = []
+
+            for neighbor in find_neighbors(current_position[0], current_position[1]):
+                available_actions.append("MOVE", neighbor[0], neighbor[1])
+                available_actions.append("WAIT", current_position[0], current_position[1])
+                available_actions.append("BOMB", current_position[0], current_position[1])
+            return available_actions
+
+
+
+        def get_blocked_path_features(action):
+                action_type = action[0]
+                action_x = action[1]
+                action_y = action[2]
+    
+                board_size = max(wrld.width(), wrld.height())
+    
+                # Chebyshev distance because diagonal movement is allowed
+                distance_to_exit = max(
+                    abs(action_x - wrld.exitcell[0]),
+                    abs(action_y - wrld.exitcell[1])
+                )
+    
+                # Default if no wall is found
+                distance_to_wall = board_size
+    
+                # Look downward from the proposed action
+                for i in range(1, wrld.height()):
+                    check_y = action_y + i
+    
+                    # Check bounds before calling wall_at()
+                    if check_y >= wrld.height():
+                        break
+    
+                    if wrld.wall_at(action_x, check_y):
+                        distance_to_wall = i
+                        break
+    
+                if action_type == "BOMB":
+                    bomb = 1.0
+                else:
+                    bomb = 0.0
+    
+                features = {
+                    "distance_to_exit": distance_to_exit / board_size,
+                    "distance_to_wall": distance_to_wall / board_size,
+                    "bomb": bomb
+                }
+    
+                return features
+
+        def get_blocked_path_Q_value(action):
+        
+                features = get_blocked_path_features(action)
+                blocked_path_weights = self.Weights[RobotStates.BLOCKED_PATH]
+                Q_value =0.0
+                for feature_name, feature_value in features.items():
+                    weight = blocked_path_weights.get(feature_name, 0.0)
+                    Q_value += weight * feature_value
+                return Q_value
+
+        def choose_blocked_path_action():
+                available_actions = get_blocked_path_actions()
+                best_action = None
+                best_Q_value = float('-inf')
+                for action in available_actions:
+                    Q_value = get_blocked_path_Q_value(action)
+                    if Q_value > best_Q_value:
+                        best_Q_value = Q_value
+                        best_action = action
+                return best_action
 
         def get_bomb_actions():
             current_position = (wrld.me(self).x, wrld.me(self).y)
@@ -222,17 +296,19 @@ class TestCharacter(CharacterEntity):
 
             return features
         
-        def get_bomb_Q_value(weight, action, bomb):
-            features = get_bomb_features(action, bomb, self.bombs)
+        def get_bomb_Q_value( action, bomb):
+            features = get_bomb_features(action, bomb)
             bomb_weights = self.Weights[RobotStates.BOMB_EVADE]
+
             Q_value = 0.0
+
             for feature_name, feature_value in features.items():
                 weight = bomb_weights.get(feature_name, 0.0)
                 Q_value += weight * feature_value
 
             return Q_value
         
-        def choose_bomb_action(bomb):
+        def choose_bomb_action():
             available_actions = get_bomb_actions()
             best_action = None
             best_Q_value = float('-inf')
@@ -243,82 +319,7 @@ class TestCharacter(CharacterEntity):
                     best_action = action
             return best_action
         
-        #returns a list of available actions for the character to take when the path is blocked: move, wait, or bomb
-        def get_blocked_path_actions():
-            current_position = (wrld.me(self).x, wrld.me(self).y)
-            available_actions = []
-
-            for neighbor in find_neighbors(current_position[0], current_position[1]):
-                available_actions.append("MOVE", neighbor[0], neighbor[1])
-                available_actions.append("WAIT", current_position[0], current_position[1])
-                available_actions.append("BOMB", current_position[0], current_position[1])
-            return available_actions
-
-        
-        def get_blocked_path_features(action):
-            action_type = action[0]
-            action_x = action[1]
-            action_y = action[2]
-
-            board_size = max(wrld.width(), wrld.height())
-
-            # Chebyshev distance because diagonal movement is allowed
-            distance_to_exit = max(
-                abs(action_x - wrld.exitcell[0]),
-                abs(action_y - wrld.exitcell[1])
-            )
-
-            # Default if no wall is found
-            distance_to_wall = board_size
-
-            # Look downward from the proposed action
-            for i in range(1, wrld.height()):
-                check_y = action_y + i
-
-                # Check bounds before calling wall_at()
-                if check_y >= wrld.height():
-                    break
-
-                if wrld.wall_at(action_x, check_y):
-                    distance_to_wall = i
-                    break
-
-            if action_type == "BOMB":
-                bomb = 1.0
-                self.bomb.append((action_x, action_y))
-            else:
-                bomb = 0.0
-
-            features = {
-                "distance_to_exit": distance_to_exit / board_size,
-                "distance_to_wall": distance_to_wall / board_size,
-                "bomb": bomb
-            }
-
-            return features
-
-            
-        def get_blocked_path_Q_value(action):
- 
-            features = get_blocked_path_features(action)
-            blocked_path_weights = self.Weights[RobotStates.BLOCKED_PATH]
-            Q_value =0.0
-            for feature_name, feature_value in features.items():
-                weight = blocked_path_weights.get(feature_name, 0.0)
-                Q_value += weight * feature_value
-            return Q_value
-
-            
-        def choose_blocked_path_action():
-            available_actions = get_blocked_path_actions()
-            best_action = None
-            best_Q_value = float('-inf')
-            for action in available_actions:
-                Q_value = get_blocked_path_Q_value(action)
-                if Q_value > best_Q_value:
-                    best_Q_value = Q_value
-                    best_action = action
-            return best_action
+    
           
         # returns a list of available actions for the character to evade a monster
         def monster_evade_actions():
@@ -353,30 +354,33 @@ class TestCharacter(CharacterEntity):
             }
             return features
         
-        def monster_evade_Q_value(self, Weights, action):
+        def monster_evade_Q_value( action):
  
             features = monster_evade_features(action)
-            monster_evade_weights = self.Weights[RobotStates.MONSTER_EVADE]
-            Q_value =0.0
+            monster_weights = self.Weights[RobotStates.MONSTER_EVADE]
+
+            Q_value = 0.0
+
             for feature_name, feature_value in features.items():
-                weight = monster_evade_weights.get(feature_name, 0.0)
+                weight = monster_weights.get(feature_name, 0.0)
                 Q_value += weight * feature_value
+
             return Q_value
 
-        def choose_monster_evade_action(Weights):
-            actions = monster_evade_actions()
+        def choose_monster_evade_action():
+            available_actions = monster_evade_actions()
 
             best_action = None
             best_Q_value = float("-inf")
 
-            for action in actions:
-                Q_value = monster_evade_Q_value(action, Weights)
+            for action in available_actions:
+                Q_value = monster_evade_Q_value(action)
 
                 if Q_value > best_Q_value:
                     best_Q_value = Q_value
                     best_action = action
-            return best_action  
 
+            return best_action
 
         
         ##################
@@ -398,7 +402,97 @@ class TestCharacter(CharacterEntity):
             q_values.to_csv("q_values.csv", index=False) #Generate the csv
 
 
+        def get_next_state_Q_value_monsterEvade():
+            available_actions = monster_evade_actions()
+            best_Q_value = float("-inf")
 
+            for next_action in available_actions:
+                Q_value = monster_evade_Q_value(next_action)
+
+                if Q_value > best_Q_value:
+                    best_Q_value = Q_value
+
+            if best_Q_value == float("-inf"):
+                return 0.0
+
+            return best_Q_value
+
+        ###################################
+        #ApproximateQLearningAct&Update####
+        ###################################
+
+        def act_on_q_value_blocked_path():
+                action = choose_blocked_path_action()
+                if action is None:
+                    return
+                self.previous_features = get_blocked_path_features(action).copy()
+                self.previous_Q_value = get_blocked_path_Q_value(action)
+                self.previous_behavior = RobotStates.BLOCKED_PATH
+
+                if action[0] == "MOVE":
+                    self.move(action[1] - wrld.me(self).x, action[2] - wrld.me(self).y)
+                elif action[0] == "WAIT":
+                    self.wait()
+                elif action[0] == "BOMB":
+                    self.place_bomb()
+        def act_on_q_value_evade_monster():
+                        action = choose_monster_evade_action()
+                        if action is None:
+                            return
+                        self.previous_features = monster_evade_features(action).copy()
+                        self.previous_Q_value = monster_evade_Q_value(action)
+                        self.previous_behavior = RobotStates.MONSTER_EVADE
+                        
+                        if action[0] == "MOVE":
+                            self.move(action[1] - wrld.me(self).x, action[2] - wrld.me(self).y)
+                        elif action[0] == "WAIT":
+                            self.wait()
+                        elif action[0] == "BOMB":
+                            self.place_bomb()
+        def act_on_q_value_evade_bomb():
+            action = choose_bomb_action(wrld.bombs)
+
+            if action is None:
+                return
+
+            self.previous_features = get_bomb_features(
+                action, wrld.bombs
+            ).copy()
+
+            self.previous_Q_value = get_bomb_Q_value(
+                action, wrld.bombs
+            )
+
+            self.previous_behavior = RobotStates.BOMB_EVADE
+
+            if action[0] == "MOVE":
+                self.move(
+                    action[1] - wrld.me(self).x,
+                    action[2] - wrld.me(self).y
+                )
+            elif action[0] == "WAIT":
+                self.wait()
+            elif action[0] == "BOMB":
+                self.place_bomb()    
+
+                       
+    
+        def update_previous_weights(reward, next_max_Q):
+            alpha = 0.1
+            gamma = 0.9
+
+            error = (
+                reward
+                + gamma * next_max_Q
+                - self.previous_Q_value
+            )
+
+            previous_weights = self.Weights[self.previous_behavior]
+
+            for feature_name, feature_value in self.previous_features.items():
+                previous_weights[feature_name] += (
+                    alpha * error * feature_value
+        )
         ###########
         #Update####
         ###########
@@ -408,12 +502,62 @@ class TestCharacter(CharacterEntity):
             if ROBOT_STATE == RobotStates.CHECK_PATH:
                 pass
             if ROBOT_STATE == RobotStates.CLEAR_PATH:
+                  #Call BFS 
+                Path = BFS((wrld.me(self).x, wrld.me(self).y), wrld.exitcell)
+                follow_path(Path)
                 pass
+
             if ROBOT_STATE == RobotStates.BLOCKED_PATH:
+                
+
+                if hasattr(self, "previous_features"):
+                     best_action = choose_blocked_path_action()
+                     if best_action is not None:
+                          next_max_Q = get_blocked_path_Q_value(best_action)
+
+                          reward = #Input reward here based on the outcome of the previous action
+                          update_previous_weights(reward, next_max_Q)
+
+                act_on_q_value_blocked_path()
+                #get result of nxt move and update weights based on reward
+
+
                 pass
+
+
             if ROBOT_STATE == RobotStates.BOMB_EVADE:
+                if hasattr(self, "previous_features"):
+                    best_action = choose_bomb_action(wrld.bombs)
+
+                    if best_action is not None:
+                        next_max_Q = get_bomb_Q_value(
+                            best_action, wrld.bombs
+                        )
+                    else:
+                        next_max_Q = 0.0
+
+                    # Temporary until we write the reward function
+                    reward = 0.0
+                    update_previous_weights(reward, next_max_Q)
+
+                act_on_q_value_evade_bomb()
+
+
                 pass
             if ROBOT_STATE == RobotStates.MONSTER_EVADE:
+                if hasattr(self, "previous_features"):
+                    best_action = choose_monster_evade_action()
+
+                    if best_action is not None:
+                        next_max_Q = monster_evade_Q_value(best_action)
+                    else:
+                        next_max_Q = 0.0
+
+                    # Temporary until we write the reward function
+                    reward = 0.0
+                    update_previous_weights(reward, next_max_Q)
+
+                act_on_q_value_evade_monster()
                 pass
 
         ###########
