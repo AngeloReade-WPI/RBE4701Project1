@@ -27,33 +27,44 @@ class TestCharacter(CharacterEntity):
     # Use epsilon=0.0 for evaluation after training.
     epsilon = 0.15
 
-    def choose_q_action(self, available_actions, q_function):
+    def choose_q_action(self, available_actions, q_function):# Choosing action
         if not available_actions:
             return None
-        if random.random() < self.epsilon:
+        if random.random() < self.epsilon: # If random number is less than epsilon, choose a random action (exploration)
             return random.choice(available_actions)
 
         scored_actions = [
-            (action, q_function(action)) for action in available_actions
+            (action, q_function(action)) for action in available_actions # Returns the possible actions and their corresponding Q-values
         ]
-        best_Q = max(value for action, value in scored_actions)
-        best_actions = [
+        best_Q = max(value for action, value in scored_actions) # Find the maximum Q-value among the scored actions
+        best_actions = [ 
             action for action, value in scored_actions
-            if math.isclose(value, best_Q, rel_tol=1e-12, abs_tol=1e-12)
+            if math.isclose(value, best_Q, rel_tol=1e-12, abs_tol=1e-12) 
+            # Finds multiple actions with similar values, 1e-12 = 1E-10%. 
+            # rel_tolerance finds ones that are 1E-10% similar
+            # abs_tolerance finds ones that are 1E-12 similar
         ]
-        return random.choice(best_actions)
+        return random.choice(best_actions) #picks a random action from the best actions
 
-    def get_max_Q(self, available_actions, q_function):
+    def get_max_Q(self, available_actions, q_function): 
         # The training target must be a maximum, even during exploration.
-        return max((q_function(action) for action in available_actions), default=0.0)
-
-    def can_place_bomb(self, wrld):
+        return max((q_function(action) for action in available_actions), default=0.0) #gets the maximum Q-value from the available actions
+    
+    def can_place_bomb(self, wrld): 
+        # Checks if a bomb can be placed at the character's current position
+        # False if a bomb exists
         me = wrld.me(self)
         if wrld.bomb_at(me.x, me.y):
             return False
+        # False if a bomb exists that was placed by this character
+        # Checks if the name of the owner of any bomb in the world is the same as the name of this character
+        # if no bomb matches the character's name, return True
+
         return not any(bomb.owner.name == self.name for bomb in wrld.bombs.values())
+    
 
     def get_wall_distance(self, wrld, position):
+        
         # Nearest wall along any of the four bomb-blast directions.
         board_size = max(wrld.width(), wrld.height())
         nearest = board_size
@@ -69,7 +80,7 @@ class TestCharacter(CharacterEntity):
         return nearest
 
     def bomb_would_hit_wall(self, wrld, position):
-        # Estimate usefulness from the current board. Entities can move
+        # Estimate value from the current board. Entities can move
         # before detonation, so the actual wall-hit event supplies the reward.
         for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             for distance in range(1, wrld.expl_range + 1):
@@ -86,7 +97,9 @@ class TestCharacter(CharacterEntity):
         return False
 
 
-    def save_weights(self):
+    def save_weights(self): 
+
+        # Collects the current updated weights and saves them to the csv for later
         rows = []
 
         for behavior, weights in self.Weights.items():
@@ -104,8 +117,10 @@ class TestCharacter(CharacterEntity):
 
         saved_weights.to_csv("weights.csv", index=False)
 
-    def update_previous_weights(self, reward, next_max_Q):
-        alpha = 0.2
+    def update_previous_weights(self, reward, next_max_Q): 
+
+        #
+        alpha = 0.6
         gamma = 0.9
 
         error = (
