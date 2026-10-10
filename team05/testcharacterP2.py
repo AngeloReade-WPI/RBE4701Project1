@@ -15,7 +15,7 @@ import pandas as pd
 #import enum for RobotStates
 from enum import Enum, auto
 
-class RobotStates(Enum):
+class RobotStates(Enum): #init states for the robot
     CHECK_PATH = auto()
     CLEAR_PATH = auto()
     BLOCKED_PATH = auto()
@@ -27,30 +27,40 @@ class TestCharacter(CharacterEntity):
     # Use epsilon=0.0 for evaluation after training.
     epsilon = 0.15
 
-    def choose_q_action(self, available_actions, q_function):
+    def choose_q_action(self, available_actions, q_function): # CHoosing action
         if not available_actions:
             return None
-        if random.random() < self.epsilon:
+        if random.random() < self.epsilon: # If random number is less than epsilon, choose a random action (exploration)
             return random.choice(available_actions)
 
         scored_actions = [
-            (action, q_function(action)) for action in available_actions
+            (action, q_function(action)) for action in available_actions  # Returns the possible actions and their corresponding Q-values
         ]
-        best_Q = max(value for action, value in scored_actions)
+        best_Q = max(value for action, value in scored_actions) # Find the maximum Q-value among the scored actions
         best_actions = [
             action for action, value in scored_actions
             if math.isclose(value, best_Q, rel_tol=1e-12, abs_tol=1e-12)
+            # Finds multiple actions with similar values, 1e-12 = 1E-10%. 
+            # rel_tolerance finds ones that are 1E-10% similar
+            # abs_tolerance finds ones that are 1E-12 similar
         ]
-        return random.choice(best_actions)
+        return random.choice(best_actions) #picks a random action from the best actions
 
     def get_max_Q(self, available_actions, q_function):
-        # The training target must be a maximum, even during exploration.
+        #gets the maximum Q-value from the available actions
         return max((q_function(action) for action in available_actions), default=0.0)
 
     def can_place_bomb(self, wrld):
+
+        # Checks if a bomb can be placed at the character's current position
+        # False if a bomb exists
         me = wrld.me(self)
         if wrld.bomb_at(me.x, me.y):
             return False
+        # False if a bomb exists that was placed by this character
+        # Checks if the name of the owner of any bomb in the world is the same as the name of this character
+        # if no bomb matches the character's name, return True
+
         return not any(bomb.owner.name == self.name for bomb in wrld.bombs.values())
 
     def get_wall_distance(self, wrld, position):
@@ -87,6 +97,7 @@ class TestCharacter(CharacterEntity):
 
 
     def save_weights(self):
+        # Collects the current updated weights and saves them to the csv for later
         rows = []
 
         for behavior, weights in self.Weights.items():
@@ -102,21 +113,23 @@ class TestCharacter(CharacterEntity):
             columns=["Behavior", "Feature", "Weight"]
         )
 
-        saved_weights.to_csv("weights.csv", index=False)
+        saved_weights.to_csv("weights.csv", index=False) 
+        #Adds the weights to csv
+        # =False prevents the index column being generated
 
     def update_previous_weights(self, reward, next_max_Q):
-        alpha = 0.2
+        alpha = 0.2 # Values for updates 
         gamma = 0.9
 
-        error = (
-            reward
+        error = ( # Error equation from lecture slides
+            reward 
             + gamma * next_max_Q
             - self.previous_Q_value
         )
 
-        previous_weights = self.Weights[self.previous_behavior]
+        previous_weights = self.Weights[self.previous_behavior] #pulls previous weights from csv
 
-        for feature_name, feature_value in self.previous_features.items():
+        for feature_name, feature_value in self.previous_features.items(): 
             previous_weights[feature_name] = (
                 previous_weights.get(feature_name, 0.0)
                 + alpha * error * feature_value
