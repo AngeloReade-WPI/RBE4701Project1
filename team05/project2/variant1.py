@@ -9,7 +9,7 @@ from game import Game
 # TODO This is your code!
 sys.path.insert(1, '../teamNN')
 from testcharacterP2 import TestCharacter
-
+from interactivecharacterP2 import InteractiveCharacter
 
 # Create the game
 g = Game.fromfile('map.txt')

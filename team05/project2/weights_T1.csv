@@ -1,0 +1,13 @@
+Behavior,Feature,Weight
+BLOCKED_PATH,distance_to_exit,1.73584301448532
+BLOCKED_PATH,distance_to_wall,0.8438751792930758
+BLOCKED_PATH,bomb,4.415900332675099
+BLOCKED_PATH,bomb_hits_wall,3.415900332675098
+BOMB_EVADE,distance_to_exit,22.18525066599666
+BOMB_EVADE,distance_to_bomb,-23.340660024736298
+BOMB_EVADE,bomb,1.0
+BOMB_EVADE,bomb_danger,-26.239349012229923
+BOMB_EVADE,bomb_hits_wall,0.0
+MONSTER_EVADE,distance_to_exit,1.0
+MONSTER_EVADE,distance_to_monster,1.0
+MONSTER_EVADE,bomb,1.0
