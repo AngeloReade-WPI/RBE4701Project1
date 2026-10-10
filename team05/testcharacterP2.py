@@ -168,7 +168,7 @@ class TestCharacter(CharacterEntity):
         return removed
 
     # Use training=False for evaluation with frozen weights and no exploration.
-    epsilon = 0.2
+    epsilon = 0.1
 
     def choose_q_action(self, available_actions, q_function):
         if not available_actions:
@@ -232,7 +232,46 @@ class TestCharacter(CharacterEntity):
                 safe_actions.append(action)
         # If no escape exists, preserve available actions so the terminal
         # outcome still updates the pending learned action normally.
-        return safe_actions or actions
+        return self.filter_monster_actions(wrld, safe_actions or actions)
+
+    def filter_monster_actions(self, wrld, actions):
+        # Monsters move before the character, and hitting its old position
+        # is fatal even if it moves away. Leave two monster steps of clearance:
+        # this turn's move and the move before our following action executes.
+        threatened = set()
+        for monsters in wrld.monsters.values():
+            for monster in monsters:
+                position = (monster.x, monster.y)
+                reachable = {position}
+                for _ in range(2):
+                    reachable.update(cell for origin in tuple(reachable)
+                                     for cell in self.grid_neighbors(wrld, origin)
+                                     if not wrld.wall_at(*cell))
+                threatened.update(reachable)
+        safe = [action for action in actions
+                if (action[1], action[2]) not in threatened]
+        if safe or not actions:
+            return safe
+        # No collision-free option: retain the greatest separation available.
+        distances = [self.get_monster_distance(wrld, (a[1], a[2]))
+                     for a in actions]
+        best = max(distances)
+        return [a for a, distance in zip(actions, distances) if distance == best]
+
+    def monster_action_features(self, wrld, action):
+        me = wrld.me(self)
+        position = (action[1], action[2])
+        exit_x, exit_y = wrld.exitcell
+        before = max(abs(me.x - exit_x), abs(me.y - exit_y))
+        after = max(abs(position[0] - exit_x), abs(position[1] - exit_y))
+        distance = self.get_monster_distance(wrld, position)
+        previous_distance = self.get_monster_distance(wrld, (me.x, me.y))
+        return {
+            'bias': 1.0,
+            'exit_progress': float(before - after),
+            'monster_progress': float(distance - previous_distance),
+            'monster_risk': 1.0 / (1.0 + distance)
+        }
 
 
 
@@ -480,9 +519,10 @@ class TestCharacter(CharacterEntity):
                 },
 
                 RobotStates.MONSTER_EVADE: {
-                    "distance_to_exit": 1.0,
-                    "distance_to_monster": 1.0,
-                    "bomb": 1.0
+                    "bias": 0.0,
+                    "exit_progress": 1.0,
+                    "monster_progress": 1.0,
+                    "monster_risk": -5.0
                 }
             }
 
@@ -705,26 +745,7 @@ class TestCharacter(CharacterEntity):
             return self.filter_immediate_blast_actions(wrld, available_actions)
 
         def monster_evade_features(action):
-            action_type = action[0]
-            action_x = action[1]
-            action_y = action[2]
-
-            board_size = max(wrld.width(), wrld.height())
-            distance_to_monster = board_size
-
-            for monster in get_monster_list():
-                distance = max(abs(action_x - monster.x),abs(action_y - monster.y))
-
-                if distance < distance_to_monster:
-                    distance_to_monster = distance
-        
-            distance_to_exit = max(abs(action_x - wrld.exitcell[0]),abs(action_y - wrld.exitcell[1]))
-        
-            features = {
-            "distance_to_monster": distance_to_monster / board_size,
-            "distance_to_exit": distance_to_exit / board_size
-            }
-            return features
+            return self.monster_action_features(wrld, action)
         
         def monster_evade_Q_value( action):
  
@@ -919,12 +940,12 @@ class TestCharacter(CharacterEntity):
             if purposed_path is None:
                 return True
 
-        # If there is a direct path to the monster in front of the character, return true.
+        # Evade reachable monsters nearby; distant monsters do not stop navigation.
         def check_monster_in_path():
             monster_list = get_monster_list()
             for monster in monster_list:
                 purposed_path = BFS((wrld.me(self).x, wrld.me(self).y), (monster.x, monster.y))
-                if purposed_path is not None:
+                if purposed_path is not None and len(purposed_path) - 1 <= 4:
                     return True
             return False
 
