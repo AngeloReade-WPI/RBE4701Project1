@@ -13,7 +13,7 @@ from testcharacterP2 import TestCharacter
 
 
 # Create the game
-g = Game.fromfile('trainingmap1_wall.txt')
+g = Game.fromfile('map.txt')
 
 # TODO Add your character
 g.add_character(TestCharacter("me", # name

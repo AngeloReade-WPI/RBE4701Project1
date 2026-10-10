@@ -1,6 +1,8 @@
 # This is necessary to find the main code
 import os
 import math
+import heapq
+from collections import deque
 import random
 import sys
 sys.path.insert(0, os.path.join(
@@ -23,14 +25,155 @@ class RobotStates(Enum):
     MONSTER_EVADE = auto()
 
 class TestCharacter(CharacterEntity):
+
+
     training = True
-    # Use epsilon=0.0 for evaluation after training.
+
+    @staticmethod
+    def grid_neighbors(wrld, position):
+        x, y = position
+        for dx, dy in ((1, 0), (1, 1), (1, -1), (0, 1),
+                       (0, -1), (-1, 0), (-1, 1), (-1, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < wrld.width() and 0 <= ny < wrld.height():
+                yield nx, ny
+
+    def route_cost_map(self, wrld, walls):
+        # Dijkstra: minimize walls crossed first, then number of moves.
+        # This supplies features; it does not choose the agent's actions.
+        costs = {wrld.exitcell: (0, 0)}
+        queue = [(0, 0, wrld.exitcell)]
+        while queue:
+            wall_count, steps, position = heapq.heappop(queue)
+            if costs[position] != (wall_count, steps):
+                continue
+            for neighbor in self.grid_neighbors(wrld, position):
+                # Reverse search: forward movement from neighbor enters position.
+                new_cost = (wall_count + int(position in walls), steps + 1)
+                if new_cost < costs.get(neighbor, (float('inf'), float('inf'))):
+                    costs[neighbor] = new_cost
+                    heapq.heappush(queue, (*new_cost, neighbor))
+        return costs
+
+    def walk_distances(self, wrld, starts, walls):
+        distances = {position: 0 for position in starts if position not in walls}
+        queue = deque(distances)
+        while queue:
+            position = queue.popleft()
+            for neighbor in self.grid_neighbors(wrld, position):
+                if neighbor not in walls and neighbor not in distances:
+                    distances[neighbor] = distances[position] + 1
+                    queue.append(neighbor)
+        return distances
+
+    def predicted_wall_hits(self, wrld, position, walls):
+        hits = set()
+        # Static geometry estimate. Moving entities may change before detonation.
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            for distance in range(1, wrld.expl_range + 1):
+                cell = (position[0] + dx * distance, position[1] + dy * distance)
+                if not (0 <= cell[0] < wrld.width() and 0 <= cell[1] < wrld.height()):
+                    break
+                if cell == wrld.exitcell or wrld.bomb_at(*cell):
+                    break
+                if cell in walls:
+                    hits.add(cell)
+                    break
+        return hits
+
+    def get_navigation_info(self, wrld, start):
+        walls = {
+            (x, y) for x in range(wrld.width()) for y in range(wrld.height())
+            if wrld.wall_at(x, y)
+        }
+        cache_key = (
+            wrld.width(), wrld.height(), wrld.exitcell, frozenset(walls),
+            frozenset((bomb.x, bomb.y) for bomb in wrld.bombs.values()),
+            frozenset((explosion.x, explosion.y) for explosion in wrld.explosions.values())
+        )
+        cached = getattr(self, '_navigation_cache', None)
+        if (getattr(self, '_navigation_cache_key', None) == cache_key and
+                cached is not None and start in cached['reachable']):
+            return cached
+        costs = self.route_cost_map(wrld, walls)
+        reachable = self.walk_distances(wrld, [start], walls)
+        useful_positions = set()
+        best_remaining_walls = costs[start][0]
+        simulated_costs = {}
+        for position in reachable:
+            if wrld.bomb_at(*position) or wrld.explosion_at(*position):
+                continue
+            hits = frozenset(self.predicted_wall_hits(wrld, position, walls))
+            if not hits:
+                continue
+            if hits not in simulated_costs:
+                simulated_costs[hits] = self.route_cost_map(wrld, walls - hits)[start][0]
+            remaining_walls = simulated_costs[hits]
+            if remaining_walls < best_remaining_walls:
+                best_remaining_walls = remaining_walls
+                useful_positions = {position}
+            elif remaining_walls == best_remaining_walls and remaining_walls < costs[start][0]:
+                useful_positions.add(position)
+
+        # If the exit is reachable, route features point toward the exit.
+        # Otherwise they point to reachable sites that remove the next barrier.
+        targets = {wrld.exitcell} if costs[start][0] == 0 else useful_positions
+        distances = self.walk_distances(wrld, targets, walls)
+        info = {
+            'walls': walls,
+            'route_costs': costs,
+            'targets': targets,
+            'useful_bomb_positions': useful_positions,
+            'target_distances': distances,
+            'reachable': set(reachable),
+            'distance_scale': max(1, wrld.width() * wrld.height())
+        }
+        self._navigation_cache_key = cache_key
+        self._navigation_cache = info
+        return info
+
+    def route_action_features(self, wrld, action):
+        action_type, x, y = action
+        info = self.navigation_info
+        me = wrld.me(self)
+        distances = info['target_distances']
+        default_distance = info['distance_scale']
+        previous_distance = distances.get((me.x, me.y), default_distance)
+        action_distance = distances.get((x, y), default_distance)
+        return {
+            'bias': 1.0,
+            'distance_to_target': action_distance / default_distance,
+            'target_progress': float(previous_distance - action_distance),
+            # Distinguish waiting/sideways wandering at a useful site from
+            # taking the bombing action that can actually open the route.
+            'idle_at_target': float(
+                action_type != 'BOMB' and previous_distance == 0 and action_distance == 0
+            ),
+            'place_bomb': float(action_type == 'BOMB'),
+            'bomb_opens_route': float(
+                action_type == 'BOMB' and (x, y) in info['useful_bomb_positions']
+            )
+        }
+
+    def collect_removed_own_walls(self, wrld):
+        # This engine clears walls when explosions expire, not at wall-hit time.
+        # Track our wall-hit cells until that actual removal occurs.
+        pending = getattr(self, 'pending_own_wall_hits', set())
+        for explosion in wrld.explosions.values():
+            cell = (explosion.x, explosion.y)
+            if explosion.owner.name == self.name and wrld.wall_at(*cell):
+                pending.add(cell)
+        removed = {cell for cell in pending if not wrld.wall_at(*cell)}
+        self.pending_own_wall_hits = pending - removed
+        return removed
+
+    # Use training=False for evaluation with frozen weights and no exploration.
     epsilon = 0.2
 
     def choose_q_action(self, available_actions, q_function):
         if not available_actions:
             return None
-        if random.random() < self.epsilon:
+        if self.training and random.random() < self.epsilon:
             return random.choice(available_actions)
 
         scored_actions = [
@@ -53,37 +196,45 @@ class TestCharacter(CharacterEntity):
             return False
         return not any(bomb.owner.name == self.name for bomb in wrld.bombs.values())
 
-    def get_wall_distance(self, wrld, position):
-        # Nearest wall along any of the four bomb-blast directions.
-        board_size = max(wrld.width(), wrld.height())
-        nearest = board_size
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            for distance in range(1, board_size):
-                x = position[0] + dx * distance
-                y = position[1] + dy * distance
-                if not (0 <= x < wrld.width() and 0 <= y < wrld.height()):
+    def filter_immediate_blast_actions(self, wrld, actions):
+        # Keep exploration from stepping into an active explosion or a blast
+        # about to fire. Bombs update before characters move in this engine,
+        # so a cell must be cleared one decision before a timer reaches zero.
+        safe_actions = []
+        for action in actions:
+            position = (action[1], action[2])
+            if wrld.explosion_at(*position):
+                continue
+            danger = False
+            for bomb in wrld.bombs.values():
+                if bomb.timer > 1:
+                    continue
+                if position == (bomb.x, bomb.y):
+                    danger = True
                     break
-                if wrld.wall_at(x, y):
-                    nearest = min(nearest, distance)
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    for distance in range(1, wrld.expl_range + 1):
+                        cell = (bomb.x + dx * distance, bomb.y + dy * distance)
+                        if not (0 <= cell[0] < wrld.width() and 0 <= cell[1] < wrld.height()):
+                            break
+                        if cell == wrld.exitcell or wrld.bomb_at(*cell):
+                            break
+                        if cell == position:
+                            danger = True
+                            break
+                        if wrld.wall_at(*cell):
+                            break
+                    if danger:
+                        break
+                if danger:
                     break
-        return nearest
+            if not danger:
+                safe_actions.append(action)
+        # If no escape exists, preserve available actions so the terminal
+        # outcome still updates the pending learned action normally.
+        return safe_actions or actions
 
-    def bomb_would_hit_wall(self, wrld, position):
-        # Estimate usefulness from the current board. Entities can move
-        # before detonation, so the actual wall-hit event supplies the reward.
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            for distance in range(1, wrld.expl_range + 1):
-                x = position[0] + dx * distance
-                y = position[1] + dy * distance
-                if not (0 <= x < wrld.width() and 0 <= y < wrld.height()):
-                    break
-                if wrld.exit_at(x, y) or wrld.bomb_at(x, y):
-                    break
-                if wrld.wall_at(x, y):
-                    return True
-                if wrld.monsters_at(x, y) or wrld.characters_at(x, y):
-                    break
-        return False
+
 
 
     def save_weights(self):
@@ -105,7 +256,9 @@ class TestCharacter(CharacterEntity):
         saved_weights.to_csv("weights.csv", index=False)
 
     def update_previous_weights(self, reward, next_max_Q):
-        alpha = 0.5
+        if not self.training:
+            return
+        alpha = 0.1
         gamma = 0.9
 
         error = (
@@ -161,12 +314,9 @@ class TestCharacter(CharacterEntity):
     def remember_reward_inputs(self, wrld):
         me = wrld.me(self)
         self.previous_position = (me.x, me.y)
-        self.previous_monster_distance = self.get_monster_distance(
-            wrld, self.previous_position
-        )
-        self.previous_bomb_danger = self.in_bomb_danger(
-            wrld, self.previous_position
-        )
+        self.previous_monster_distance = self.get_monster_distance(wrld, self.previous_position)
+        self.previous_bomb_danger = self.in_bomb_danger(wrld, self.previous_position)
+        self.previous_navigation = self.navigation_info
 
     def get_reward(self, wrld, died=False, reachedExit=False):
         if died:
@@ -176,36 +326,34 @@ class TestCharacter(CharacterEntity):
 
         me = wrld.me(self)
         current_position = (me.x, me.y)
-        previous_exit_distance = max(
-            abs(self.previous_position[0] - wrld.exitcell[0]),
-            abs(self.previous_position[1] - wrld.exitcell[1])
-        )
-        current_exit_distance = max(
-            abs(current_position[0] - wrld.exitcell[0]),
-            abs(current_position[1] - wrld.exitcell[1])
-        )
-        exit_progress = previous_exit_distance - current_exit_distance
-        current_monster_distance = self.get_monster_distance(
-            wrld, current_position
-        )
-        monster_progress = (
-            current_monster_distance - self.previous_monster_distance
-        )
+        current_monster_distance = self.get_monster_distance(wrld, current_position)
         current_bomb_danger = self.in_bomb_danger(wrld, current_position)
+        previous_info = self.previous_navigation
+        current_info = self.navigation_info
         reward = -0.1
 
-        # This event identifies OUR bomb, even if behavior changed since
-        # placement. The wall clears when its explosion expires in this engine.
-        hit_wall = any(
-            event.tpe == Event.BOMB_HIT_WALL and
-            event.character.name == self.name
-            for event in wrld.events
-        )
-        if hit_wall:
-            reward += 15.0
+        removed = self.collect_removed_own_walls(wrld)
+        if removed:
+            # Compare from the SAME position so movement is not counted as demolition.
+            # Undo just our removals to isolate their contribution from other bombs.
+            without_our_removals = self.route_cost_map(wrld, current_info['walls'] | removed)
+            before = without_our_removals[self.previous_position]
+            after = current_info['route_costs'][self.previous_position]
+            barriers_removed = before[0] - after[0]
+            if barriers_removed > 0:
+                reward += 15.0 * barriers_removed
 
         if self.previous_behavior == RobotStates.MONSTER_EVADE:
-            reward += monster_progress + 0.5 * exit_progress
+            previous_exit_distance = max(
+                abs(self.previous_position[0] - wrld.exitcell[0]),
+                abs(self.previous_position[1] - wrld.exitcell[1])
+            )
+            current_exit_distance = max(
+                abs(current_position[0] - wrld.exitcell[0]),
+                abs(current_position[1] - wrld.exitcell[1])
+            )
+            monster_progress = current_monster_distance - self.previous_monster_distance
+            reward += monster_progress + 0.5 * (previous_exit_distance - current_exit_distance)
             if current_monster_distance == 0:
                 reward -= 100.0
             elif current_monster_distance == 1:
@@ -214,18 +362,19 @@ class TestCharacter(CharacterEntity):
                 reward -= 10.0
 
         elif self.previous_behavior == RobotStates.BOMB_EVADE:
-            # Award one escape bonus when the position changes from danger
-            # to safety; merely staying safe does not earn it again.
-            if self.previous_bomb_danger and not current_bomb_danger:
-                reward += 5.0
-            elif current_bomb_danger:
+            # No escape bonus: cycling into danger and back out cannot earn reward.
+            if current_bomb_danger:
                 reward -= 3.0
 
         elif self.previous_behavior == RobotStates.BLOCKED_PATH:
-            reward += 0.5 * exit_progress
-
-        elif self.previous_behavior == RobotStates.CLEAR_PATH:
-            reward += exit_progress
+            if previous_info['walls'] == current_info['walls']:
+                # Same target set for both positions; moving back cancels progress.
+                distances = previous_info['target_distances']
+                if self.previous_position in distances and current_position in distances:
+                    reward += distances[self.previous_position] - distances[current_position]
+            if self.previous_features.get('place_bomb', 0.0):
+                # A small action cost, not an unverified reward for predicted wall hits.
+                reward -= 0.5
 
         return reward
 
@@ -233,7 +382,7 @@ class TestCharacter(CharacterEntity):
         for attribute in (
             'previous_features', 'previous_Q_value', 'previous_behavior',
             'previous_position', 'previous_monster_distance',
-            'previous_bomb_danger'
+            'previous_bomb_danger', 'previous_navigation'
         ):
             if hasattr(self, attribute):
                 delattr(self, attribute)
@@ -256,10 +405,15 @@ class TestCharacter(CharacterEntity):
             reward = self.get_reward(wrld, died=died, reachedExit=reached_exit)
             self.update_previous_weights(reward, next_max_Q=0.0)
         self.clear_previous_action()
+        self.pending_own_wall_hits = set()
 
     def do(self, wrld):
         # Commands persist in this engine; start each turn stationary.
         self.move(0, 0)
+        me = wrld.me(self)
+        if me is None:
+            return
+        self.navigation_info = self.get_navigation_info(wrld, (me.x, me.y))
 
         ###########
         #States####
@@ -309,10 +463,12 @@ class TestCharacter(CharacterEntity):
         if not hasattr(self, "Weights"):
             self.Weights = {
                 RobotStates.BLOCKED_PATH: {
-                    "distance_to_exit": 1.0,
-                    "distance_to_wall": 1.0,
-                    "bomb": 1.0,
-                    "bomb_hits_wall": 0.0
+                    "bias": 0.0,
+                    "distance_to_target": -1.0,
+                    "target_progress": 1.0,
+                    "idle_at_target": 0.0,
+                    "place_bomb": -0.5,
+                    "bomb_opens_route": 1.0
                 },
 
                 RobotStates.BOMB_EVADE: {
@@ -320,7 +476,7 @@ class TestCharacter(CharacterEntity):
                     "distance_to_bomb": 1.0,
                     "bomb": 1.0,
                     "bomb_danger": 0.0,
-                    "bomb_hits_wall": 0.0
+                    "bomb_opens_route": 0.0
                 },
 
                 RobotStates.MONSTER_EVADE: {
@@ -334,12 +490,11 @@ class TestCharacter(CharacterEntity):
                 saved_weights = pd.read_csv("weights.csv")
 
                 for _, row in saved_weights.iterrows():
-                    behavior = RobotStates[row["Behavior"]]
+                    behavior = RobotStates.__members__.get(row["Behavior"])
                     feature = row["Feature"]
-
-                    self.Weights[behavior][feature] = float(
-                        row["Weight"]
-                    )
+                    if behavior in self.Weights and feature in self.Weights[behavior]:
+                        self.Weights[behavior][feature] = float(row["Weight"])
+                    # Retired feature names are ignored; new features use defaults.
         
             
 
@@ -439,27 +594,12 @@ class TestCharacter(CharacterEntity):
                     ("BOMB", current_position[0], current_position[1])
                 )
 
-            return available_actions
+            return self.filter_immediate_blast_actions(wrld, available_actions)
 
 
 
         def get_blocked_path_features(action):
-            action_type, action_x, action_y = action
-            board_size = max(wrld.width(), wrld.height())
-            distance_to_exit = max(
-                abs(action_x - wrld.exitcell[0]),
-                abs(action_y - wrld.exitcell[1])
-            )
-            distance_to_wall = self.get_wall_distance(wrld, (action_x, action_y))
-            return {
-                "distance_to_exit": distance_to_exit / board_size,
-                "distance_to_wall": distance_to_wall / board_size,
-                "bomb": 1.0 if action_type == "BOMB" else 0.0,
-                "bomb_hits_wall": float(
-                    action_type == "BOMB" and
-                    self.bomb_would_hit_wall(wrld, (action_x, action_y))
-                )
-            }
+            return self.route_action_features(wrld, action)
 
         def get_blocked_path_Q_value(action):
         
@@ -496,7 +636,7 @@ class TestCharacter(CharacterEntity):
                     ("BOMB", current_position[0], current_position[1])
                 )
 
-            return available_actions
+            return self.filter_immediate_blast_actions(wrld, available_actions)
 
         def choose_bomb_action(bombs):
             return self.choose_q_action(
@@ -533,9 +673,9 @@ class TestCharacter(CharacterEntity):
                     action_type == "BOMB" or
                     self.in_bomb_danger(wrld, (action_x, action_y))
                 ),
-                "bomb_hits_wall": float(
+                "bomb_opens_route": float(
                     action_type == "BOMB" and
-                    self.bomb_would_hit_wall(wrld, (action_x, action_y))
+                    (action_x, action_y) in self.navigation_info['useful_bomb_positions']
                 )
             }
         
@@ -562,7 +702,7 @@ class TestCharacter(CharacterEntity):
                 available_actions.append(("MOVE", neighbor[0], neighbor[1]))
                 #moved outside for loop
             available_actions.append(("WAIT", current_position[0], current_position[1]))
-            return available_actions
+            return self.filter_immediate_blast_actions(wrld, available_actions)
 
         def monster_evade_features(action):
             action_type = action[0]
@@ -838,4 +978,3 @@ class TestCharacter(CharacterEntity):
         else:
             handle_check_path_blocked()
       # Test Commit 
-
